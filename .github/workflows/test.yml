@@ -1,0 +1,46 @@
+name: Test
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    name: Ruby ${{ matrix.ruby }}, mongo ${{ matrix.mongo }}
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        ruby: ["3.4", "4.0"]
+        mongo: ["~> 2.24.0", "~> 2.25.0", "~> 2.26.0"]
+
+    env:
+      BUNDLE_WITHOUT: benchmark
+      MONGO_RUBY_DRIVER_VERSION: ${{ matrix.mongo }}
+      MONGODB_URI: mongodb://localhost:27017/async_mongo_test
+
+    steps:
+      - uses: actions/checkout@v4
+      # Not a service container, which can't pass arguments: the CMAP and failure specs need fail points.
+      - name: Start MongoDB with test commands
+        run: |
+          docker run -d --name mongodb -p 27017:27017 mongo:8 --setParameter enableTestCommands=1
+          for i in $(seq 1 30); do docker exec mongodb mongosh --quiet --eval "db.runCommand({ ping: 1 })" && break; sleep 1; done
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: ${{ matrix.ruby }}
+          bundler-cache: true
+      - run: bundle exec rspec
+
+  lint:
+    runs-on: ubuntu-latest
+    env:
+      BUNDLE_WITHOUT: benchmark
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: "4.0"
+          bundler-cache: true
+      - run: bundle exec rubocop
