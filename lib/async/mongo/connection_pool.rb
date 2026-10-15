@@ -160,6 +160,14 @@ module Async
         }
       end
 
+      # The most connections in use at once since the last call (async pool only).
+      # Tracking starts with the first call. Only call it from the owner thread.
+      #
+      # @returns [Integer]
+      def take_peak_in_use
+        @controller.take_peak_in_use
+      end
+
       def summary
         fallback = @fallback_pool ? " fallback=#{@fallback_pool.summary}" : ""
 

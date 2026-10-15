@@ -271,6 +271,53 @@ RSpec.describe(Async::Mongo::Controller) do
     end
   end
 
+  describe "#take_peak_in_use" do
+    it "returns the most connections in use since the last call" do
+      controller = build_controller
+
+      Sync do
+        expect(controller.take_peak_in_use).to eq(0)
+
+        a = controller.acquire
+        b = controller.acquire
+        controller.release(a)
+        controller.release(b)
+        controller.acquire
+
+        expect(controller.take_peak_in_use).to eq(2)
+        expect(controller.take_peak_in_use).to eq(1)
+      end
+    end
+
+    it "only tracks once asked" do
+      controller = build_controller
+
+      Sync do
+        controller.release(controller.acquire)
+
+        expect(controller.take_peak_in_use).to eq(0)
+      end
+    end
+
+    it "never exceeds the limit" do
+      controller = build_controller(limit: 2, wait_timeout: 1)
+      controller.take_peak_in_use
+
+      Sync do |task|
+        tasks = 6.times.map do
+          task.async do
+            connection = controller.acquire
+            sleep(0.001)
+            controller.release(connection)
+          end
+        end
+        tasks.each(&:wait)
+      end
+
+      expect(controller.take_peak_in_use).to eq(2)
+    end
+  end
+
   describe "#create_idle" do
     it "creates idle connections up to the given maximum" do
       controller = build_controller(limit: 5)

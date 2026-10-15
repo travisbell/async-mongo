@@ -103,6 +103,11 @@ client.cluster.servers.first.pool.stats
 # => {state: :ready, idle: 7, in_use: 1, connecting: 0, max_size: 20, min_size: 0, maintenance: true, fallback: nil}
 ```
 
+`in_use` is a snapshot, so a sampler polling it misses short bursts.
+`pool.take_peak_in_use` returns the most connections in use at once since its
+last call. Tracking starts with the first call, so a pool that's never measured
+doesn't do it.
+
 ### `Async::Mongo::SocketExtension`
 
 Prepended to `Mongo::Socket`. When a fiber scheduler is active, reads and

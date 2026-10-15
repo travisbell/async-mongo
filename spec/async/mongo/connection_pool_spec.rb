@@ -84,6 +84,20 @@ RSpec.describe(Async::Mongo::ConnectionPool) do
         expect(pool.stats).to include(idle: 1, in_use: 0, state: :ready, fallback: nil)
       end
     end
+
+    it "tracks the peak in use once asked" do
+      pool = build_pool
+      pool.ready
+      pool.take_peak_in_use
+
+      Sync do
+        connections = 2.times.map { pool.check_out }
+        connections.each { |connection| pool.check_in(connection) }
+      end
+
+      expect(pool.take_peak_in_use).to eq(2)
+      expect(pool.take_peak_in_use).to eq(0)
+    end
   end
 
   describe "#with_connection" do

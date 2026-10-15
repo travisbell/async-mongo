@@ -11,4 +11,6 @@
   - `Async::Mongo::SafeFinalizer`: a stock-pool finalizer that can't raise.
 - Behaves like `Mongo::Server::ConnectionPool` (events, close reasons, errors,
   clear/pause/populate/close semantics); passes all 32 official CMAP spec tests.
+- `ConnectionPool#take_peak_in_use`: the most connections in use at once since
+  the last call, tracked only once first called.
 - Puma vs Falcon benchmark in `bench/`, with an HTML report.

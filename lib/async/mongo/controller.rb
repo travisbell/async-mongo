@@ -40,6 +40,8 @@ module Async
         @in_use = {}.compare_by_identity
         @connecting = 0
         @error = nil
+        # Nil until {#take_peak_in_use} is first called.
+        @peak_in_use = nil
 
         # Guards @waiters and grants, which other threads read when signalling.
         @mutex = Thread::Mutex.new
@@ -80,6 +82,18 @@ module Async
       # @returns [Array(Connection)] A snapshot of the connections in use.
       def in_use
         @in_use.keys
+      end
+
+      # The most connections in use at once since the last call, after which the
+      # count restarts from the current number in use. Tracking starts with the
+      # first call (which returns the current number), so a pool that's never
+      # measured doesn't track it.
+      #
+      # @returns [Integer]
+      def take_peak_in_use
+        peak = [@peak_in_use || 0, @in_use.size].max
+        @peak_in_use = @in_use.size
+        peak
       end
 
       # Wake all waiting fibers so they notice {#error}. Safe to call from any thread.
@@ -188,11 +202,16 @@ module Async
         max.nil? || size + @connecting < max
       end
 
+      def mark_in_use(connection)
+        @in_use[connection] = true
+        @peak_in_use = @in_use.size if @peak_in_use && @in_use.size > @peak_in_use
+      end
+
       def acquire_idle
         while (connection = @idle.pop)
           # Count it as in use before unviable_reason (which may context switch), so it
           # can't be handed out twice and the limit stays accurate.
-          @in_use[connection] = true
+          mark_in_use(connection)
           reason = connection.unviable_reason
           return connection unless reason
 
@@ -214,7 +233,7 @@ module Async
         if idle
           @idle.push(connection)
         else
-          @in_use[connection] = true
+          mark_in_use(connection)
         end
 
         connection
